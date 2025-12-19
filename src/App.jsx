@@ -19,6 +19,9 @@ function App() {
   const [albums, setAlbums] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
 
+  // =======================
+  // ORIGINAL useEffect (unchanged)
+  // =======================
   useEffect(() => {
     let authParams = {
       method: "POST",
@@ -37,8 +40,30 @@ function App() {
       .then((data) => setAccessToken(data.access_token));
   }, []);
 
+  // =======================
+  // ✅ ADDED: Fetch token from Vercel serverless function
+  // =======================
+  async function fetchServerToken() {
+    try {
+      const res = await fetch("/api/token");
+      const data = await res.json();
+      if (data?.access_token) {
+        setAccessToken(data.access_token);
+      }
+    } catch (err) {
+      console.error("Failed to fetch server token", err);
+    }
+  }
+
+  // =======================
+  // ✅ ADDED: Run server token fetch on load
+  // =======================
+  useEffect(() => {
+    fetchServerToken();
+  }, []);
+
   async function fetchSuggestions(query) {
-    if (!query.trim()) {
+    if (!query.trim() || !accessToken) {
       setSuggestions([]);
       return;
     }
@@ -65,6 +90,8 @@ function App() {
   }
 
   async function search(artistName) {
+    if (!accessToken) return;
+
     let query = artistName || searchInput;
     if (!query.trim()) return;
 
@@ -80,7 +107,7 @@ function App() {
       params
     )
       .then((res) => res.json())
-      .then((data) => data.artists.items[0].id || null);
+      .then((data) => data.artists?.items?.[0]?.id || null);
 
     if (!artistID) return;
 
@@ -94,7 +121,7 @@ function App() {
     )
       .then((res) => res.json())
       .then((data) => {
-        setAlbums(data.items);
+        setAlbums(data.items || []);
       });
   }
 
@@ -132,22 +159,21 @@ function App() {
         {suggestions.length > 0 && (
           <ListGroup
             style={{
-            position: "absolute",
-            top: "40px",
-            left: "30",
-            width: "300px",
-            backgroundColor: "black",
-            border: "1px solid #ccc",
-            borderRadius: "5px",
-            zIndex: 1000,
-            boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
-      }}
-
+              position: "absolute",
+              top: "40px",
+              left: "30",
+              width: "300px",
+              backgroundColor: "black",
+              border: "1px solid #ccc",
+              borderRadius: "5px",
+              zIndex: 1000,
+              boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+            }}
           >
             {suggestions.map((artist) => (
               <ListGroup.Item
                 key={artist.id}
-                style={{ cursor: "pointer" ,textAlign:"left"}}
+                style={{ cursor: "pointer", textAlign: "left" }}
                 onClick={() => selectSuggestion(artist.name)}
               >
                 {artist.name}
@@ -179,7 +205,7 @@ function App() {
             >
               <Card.Img
                 width={200}
-                src={album.images[0].url}
+                src={album.images[0]?.url}
                 style={{ borderRadius: "4%" }}
               />
               <Card.Body>
